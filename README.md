@@ -8,6 +8,69 @@
 
 经过查资料多次尝试，发现NativeSql查询很好很强大，实现ResultTransformer可以定制查询结果转化到任意pojo，应该可以封装出我想要的`简单高效`的效果，于是又一次的努力，有了`jpa-plus`。目前，只封装了查询功能。更新功能还没封装。
 
+
+### 小知识
+
+**实体类**
+
+实体类 顶层父类是`Model`提供了ActiveRecord的模式,支持 ActiveRecord 形式调用,实体类只需继承 Model 类即可实现基本 CRUD 操作;
+实体类的 直接父类 可以是`BaseEntity`或`BaseEntity`的子类`AuditableEntity`;
+
+
+`AuditableEntity` 中定义了后台管理常用到的审计字段 `createTime``createBy` `updateTime` `updateBy`, 需要这些字段的实体类应该继承`AuditableEntity`,对应的表中也要有字段 `create_time``create_by` `update_time` `update_by`;
+写代码时 不用关心这四个字段有没有值,框架会自动赋值;
+
+实体类的 类名称和属性 与 数据库表名称和字段名称 是`驼峰转下划线连接的小写形式`的关系;
+如果表名称有实体类不具备的前缀(比如,表名称`t_job_log`,实体类名称`JobLog`),需要在实体类注解@Entity中明确赋值name(`@Entity(name = "t_job_log")`);
+
+实体类上的 表别名注解 `@TableAlias("su")`, **每个实体类都应该加上此注解**, 注解的value值应该与NativeSqlQuery中的表别名一致, `数据范围过滤`动态生成的sql片段会插入到sql模板中;
+
+
+例子: 
+```java
+@Data @Builder(toBuilder = true)
+@AllArgsConstructor @NoArgsConstructor
+@EqualsAndHashCode(callSuper = true)
+@Entity @TableAlias("su")
+public class SysUser extends AuditableEntity<SysUser,Long>{
+    // 上面几个注解是 lombok 的, 如果不知道 lombok 请上Google百度一下
+    
+    // 属性 略...
+}
+```
+
+**Dao**
+
+Dao层需要 继承 BaseRepository
+
+例子: 
+```java
+@Repository
+public interface SysOrgRepository extends BaseRepository<SysOrg,Long> {}
+```
+
+**Service**
+
+Service 接口需要 继承 IBaseService, 实现类 需要继承 BaseServiceImpl 并实现 对应的接口
+
+例子:
+
+```java
+// 接口
+public interface ISysOrgService extends IBaseService<SysOrg,Long> {}
+
+// 实现类
+@Slf4j @Service @Transactional(readOnly = true)
+public class SysOrgServiceImpl extends BaseServiceImpl<SysOrgRepository, SysOrg,Long> implements ISysOrgService {
+
+    // 在BaseServiceImpl中注入了 EntityManager //Service实现类的方法中可以直接使用;
+    
+    // 在BaseServiceImpl中注入了 dao //泛型依赖会自动传递下来,Service实现类的方法中可以直接使用 dao.xxx(yyy);
+}
+```
+
+---
+
 ### jpa-plus使用说明
 
 sevice层的方法中
