@@ -15,27 +15,27 @@ sevice层的方法中
 NativeSqlQuery nativeSql = NativeSqlQuery.builder()
     .select(查询的列) //必有
     .from(表名 AS 表别名 LEFT JOIN 表名 AS 表别名 ON XXX = YYY) //必有
-    // where 条件， eq/ne/lt/...可以出现0～n次，生成SQL时 默认会用 AND 连接所有where条件
-    // 除了 between/notBetween 需要在第一个参数写上(例如：StrUtil.isNotBland(属性))以外，其他where条件(eq/ne/lt/...)会自动判断属性不为null才生成sql片段
+    // where 条件， eq/ne/lt/...可以出现0～n次，生成SQL时 默认用 AND 连接多个where条件
+    // 自动判断属性不为null，才会生成对应sql片段
     .eq(表别名.列名, java属性值/常量值)
     .ne(表别名.列名, java属性值/常量值)
     .lt(表别名.列名, java属性值/常量值)
     .lte(表别名.列名, java属性值/常量值)
     .gt(表别名.列名, java属性值/常量值)
     .gte(表别名.列名, java属性值/常量值)
-    .isNull(表别名.列名, java属性值/常量值)
-    .isNotNull(表别名.列名, java属性值/常量值)
+    .isNull(表别名.列名) // 不需要传值
+    .isNotNull(表别名.列名) // 不需要传值
     .startsWith(表别名.列名, java属性值/常量值)
     .contains(表别名.列名, java属性值/常量值)
     .endsWith(表别名.列名, java属性值/常量值)
     .notStartsWith(表别名.列名, java属性值/常量值)
     .notContains(表别名.列名, java属性值/常量值)
     .notEndsWith(表别名.列名, java属性值/常量值)
-    .in(表别名.列名, java属性值/常量值)
-    .notIn(表别名.列名, java属性值/常量值)
-    .between(判断条件, 表别名.列名, java属性值/常量值, java属性值/常量值)
-    .notBetween(判断条件, 表别名.列名, java属性值/常量值, java属性值/常量值)
-    .sqlStrPart(自定义sql字符串片段) //追加到where条件尾部
+    .in(表别名.列名, java属性值/常量值)         // 传入Array或List
+    .notIn(表别名.列名, java属性值/常量值)      // 传入Array或List
+    .between(表别名.列名, java属性值/常量值)    // 传入Array或List, 长度应该是2
+    .notBetween(表别名.列名, java属性值/常量值) // 传入Array或List, 长度应该是2
+    .sqlStrPart(自定义sql字符串片段) //追加到where条件尾部(数据权限sql片段)
     // 以下这些 也是可有可无，跟原生sql写法别无二致
     .groupBy(表别名.列名)
     .having(表别名.列名 操作符 值 [AND/OR] [表别名.列名 操作符 值])
@@ -48,8 +48,6 @@ NativeSqlQuery nativeSql = NativeSqlQuery.builder()
     // pageRequest 需要分页,可传入. pageRequest对象中有排序的Sort数据会无视(请用orderBy()排序)
     // 返回List<pojo>或Page<pojo>
     dao.findAllByNativeSql(nativeSql, JobLog.class, pageRequest);
-
-
 ```
 
 ### jpa-plus用法示例
@@ -66,7 +64,7 @@ sevice层的方法中
         .eq("tjl.method_name", jobLog.getMethodName())
         .contains("tjl.parameter", jobLog.getParameter())
         .eq("tjl.status", jobLog.getStatus())
-        .between(Objects.nonNull(createTime), "date_format(tjl.create_time,'%Y-%m-%d')", createTime[0], createTime[1])
+        .between("date_format(tjl.create_time,'%Y-%m-%d')", createTime)
         .orderBy("tjl.id")
         .build();
 
