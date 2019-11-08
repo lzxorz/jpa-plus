@@ -16,14 +16,24 @@
 实体类 顶层父类是`Model`提供了ActiveRecord的模式,支持 ActiveRecord 形式调用,实体类只需继承 Model 类即可实现基本 CRUD 操作;
 实体类的 直接父类 可以是`BaseEntity`或`BaseEntity`的子类`AuditableEntity`;
 
+`BaseEntity`中有一个`Map<String, Object> params`，前端传数据字段多于实体类属性、不想在实体类加相应的属性时(请看下面例子)。
+
+```java
+// 实体类属性: createTime 创建时间
+// 需要范围查询
+// 添加响应属性方式： createTimeBegin、createTimeEnd ==> 调用接口传入 createTimeBegin="2049-01-01",createTimeBegin="2049-12-12"
+// 放入Map方式：  调用接口传入 params['createTime']=["2049-01-01","2049-12-12"]
+// 使用方式：     实体类对象.getParams("createTime"); //创建起止时间的数组
+```
+
 
 `AuditableEntity` 中定义了后台管理常用到的审计字段 `createTime``createBy` `updateTime` `updateBy`, 需要这些字段的实体类应该继承`AuditableEntity`,对应的表中也要有字段 `create_time``create_by` `update_time` `update_by`;
-写代码时 不用关心这四个字段有没有值,框架会自动赋值;
+**写代码**时，**不用关心**这四个字段有没有值,框架会自动赋值;
 
 实体类的 类名称和属性 与 数据库表名称和字段名称 是`驼峰转下划线连接的小写形式`的关系;
 如果表名称有实体类不具备的前缀(比如,表名称`t_job_log`,实体类名称`JobLog`),需要在实体类注解@Entity中明确赋值name(`@Entity(name = "t_job_log")`);
 
-实体类上的 表别名注解 `@TableAlias("su")`, **每个实体类都应该加上此注解**, 注解的value值应该与NativeSqlQuery中的表别名一致, `数据范围过滤`动态生成的sql片段会插入到sql模板中;
+实体类上的 表别名注解 `@TableAlias("表别名")`, **每个实体类都应该加上此注解**, 注解的value值应该与NativeSqlQuery中的表别名一致。`数据范围过滤`动态生成的sql片段会插入到sql模板中;
 
 
 例子: 
@@ -73,6 +83,8 @@ public class SysOrgServiceImpl extends BaseServiceImpl<SysOrgRepository, SysOrg,
 
 ### jpa-plus使用说明
 
+    像原生sql一样简单,像原生sql一样复杂
+
 sevice层的方法中
 ```java
 NativeSqlQuery nativeSql = NativeSqlQuery.builder()
@@ -118,7 +130,9 @@ NativeSqlQuery nativeSql = NativeSqlQuery.builder()
 sevice层的方法中
 ```java
  
-    Object createTime = jobLog.getParams("create_time"); //传进来是创建起止时间的数组
+    // 像原生sql一样简单. 也可以原生sql一样写到很复杂
+    
+    Object createTime = jobLog.getParams("createTime"); //传进来是创建起止时间的数组
 
     NativeSqlQuery nativeSql = NativeSqlQuery.builder()
         .select("tjl.*")
@@ -134,3 +148,56 @@ sevice层的方法中
     return dao.findAllByNativeSql(nativeSql, JobLog.class, pageRequest);
     
 ```
+
+---
+其他简化jpa开发的工具类
+
+**QueryRequest**
+
+查询请求,很多时候需要 分页参数、排序参数, Controller层方法的形参写上`QueryRequest`, 自动接收分页和排序参数;
+查询需要PageRequest对象,只需要调用一下`getPageRequest()`, 查询需要Sort对象,只需要调用一下`getSort()`;
+调用getPageRequest()时, 分页参数有默认备用值`pageNo`=0,`pageSize`=20;
+排序字段可以设置默认备用值`QueryRequest#setDefaultSortField("默认排序属性名称", 是否升序)`;
+
+Service代码片段示例:
+
+```java
+// 如果没接收到分页参数, 有默认备用值`pageNo`=0,`pageSize`=20;
+PageRequest pageRequest = queryRequest.getPageRequest();
+
+//  如果没接收到排序参数, setDefaultSortField设置的默认值 生效
+PageRequest pageRequest = queryRequest.setDefaultSortField("createTime", false).getPageRequest();
+
+dao.findAll(pageRequest);
+
+// 虽然使用 QueryRequest 接收 参数了, 但是只需要排序 不需要分页
+Sort sort = queryRequest.setDefaultSortField("createTime", false).getSort();
+
+// queryRequest.getSort(); // 当然 也可以 不设置 默认排序字段
+
+dao.findAll(sort);
+```
+---
+
+**PageUtil、SortUtil**
+
+查询需要排序或分页, 但是这些参数不是前端传过来的。JPA本来就是这方面的高手, 但是, 还能更优秀。
+PageUtil可以更简单构建多字段排序的PageRequest。
+
+代码片段示例:
+
+```java
+// 如果需要分页参数, PageUtil有默认备用值`pageNo`=0,`pageSize`=20;
+PageRequest pageRequest = PageUtil.builder().pageNo(0).pageSize(50).asc("age").desc("createTime").build();
+
+// 如果只需要分页 不需要排序 // 应该用jpa 自带写法
+PageRequest pageRequest = PageRequest.of(1,30);
+
+// 如果只需要排序 不需要分页 // getSort();
+Sort sort = PageUtil.builder().asc("age").desc("createTime").build().getSort();
+
+// 如果只需要排序 不需要分页 // 也可以使用工具类 SortUtil
+Sort sort = SortUtil.builder().asc("age").desc("createTime").build();
+```
+
+----
